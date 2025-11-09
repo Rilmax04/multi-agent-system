@@ -1,22 +1,15 @@
-# Standard library imports
-import os
-import subprocess
 
-# Third-party imports
+import os
+
 import google.generativeai as genai
-import requests
-import torch
+
 from dotenv import load_dotenv
 from groq import Groq
-from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 import google.generativeai as genai
 
-
-
-# Local imports
-from api.look_and_feel import error, success, warning, info
-from api.settings import settings
+from look_and_feel import error, success, warning, info
+from settings import settings
 
 load_dotenv()
 
@@ -28,7 +21,6 @@ class EragAPI:
         self.embedding_model = embedding_model or settings.get_default_embedding_model(self.embedding_class)
         self.reranker_model = reranker_model or settings.reranker_model
 
-        # API clients
         clients = {
             "groq": lambda: GroqClient(self.model),
             "gemini": lambda: GeminiClient(self.model)
@@ -37,7 +29,6 @@ class EragAPI:
             raise ValueError(f"Invalid API type: {api_type}")
         self.client = clients[api_type]()
 
-        # Embedding clients
         embedding_clients = {
             "sentence_transformers": lambda: SentenceTransformer(self.embedding_model)
         }
@@ -75,7 +66,6 @@ class EragAPI:
                 )
                 return response if stream else response.text
 
-            # Groq chat
             return self.client.chat(messages, temperature=temperature, max_tokens=max_tokens, stream=stream)
 
         except Exception as e:
@@ -135,7 +125,6 @@ class GroqClient:
         return completion if stream else completion.choices[0].message.content
 
     def complete(self, prompt, temperature=0.7, max_tokens=None, stream=False):
-        # Emulate completion via chat
         messages = [{"role": "user", "content": prompt}]
         completion = self._request(
             self.client.chat.completions.create,
@@ -200,28 +189,4 @@ def create_erag_api(api_type, model=None, embedding_class=None, embedding_model=
     reranker_model = reranker_model or settings.reranker_model
     return EragAPI(api_type, model, embedding_class, embedding_model, reranker_model)
 
-if __name__ == "__main__":
-    # Пример сообщений для чата
-    messages = [
-        {"role": "system", "content": "Ты - полезный ассистент."},
-        {"role": "user", "content": "Расскажи про важность больших языковых моделей в современном мире."}
-    ]
-
-    prompt = "Объясни как работают большие языковые модели."
-
-    # 1. Groq API
-    print(info("Calling Groq API..."))
-    groq_api = create_erag_api(api_type="groq", model="llama-3.3-70b-versatile")
-    print("- Chat:")
-    print(groq_api.chat(messages))
-    print("- Complete:")
-    print(groq_api.complete(prompt))
-
-    # 2. Gemini API
-    print(info("Calling Gemini API..."))
-    gemini_api = create_erag_api(api_type="gemini", model="gemini-2.5-flash")
-    print("- Chat:")
-    print(gemini_api.chat(messages))
-    print("- Complete:")
-    print(gemini_api.complete(prompt))
 

@@ -3,10 +3,6 @@ import os
 
 CMC_API_KEY = os.getenv("CMC_API_KEY")
 
-# ----------------------------
-# CoinGecko functions
-# ----------------------------
-
 def coingecko_current_price(coin_ids="bitcoin,ethereum", vs_currency="usd"):
     """Текущие цены, капитализация, объем и изменение за 24 часа."""
     url = "https://api.coingecko.com/api/v3/simple/price"
@@ -28,7 +24,7 @@ def coingecko_current_price(coin_ids="bitcoin,ethereum", vs_currency="usd"):
 
 
 def coingecko_historical_prices(coin_id="bitcoin", vs_currency="usd", days=7, interval="daily"):
-    """Исторические цены и объемы."""
+
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {
         "vs_currency": vs_currency,
@@ -46,7 +42,7 @@ def coingecko_historical_prices(coin_id="bitcoin", vs_currency="usd", days=7, in
 
 
 def coingecko_top_coins(limit=50, vs_currency="usd"):
-    """Топ монет по капитализации и изменение за 24 часа."""
+
     url = "https://api.coingecko.com/api/v3/coins/markets"
     params = {
         "vs_currency": vs_currency,
@@ -65,10 +61,6 @@ def coingecko_top_coins(limit=50, vs_currency="usd"):
     except Exception as e:
         return {"error": str(e)}
 
-
-# ----------------------------
-# CoinMarketCap functions
-# ----------------------------
 
 def coinmarketcap_latest(limit=10, convert="USD"):
     """Топ монет по капитализации и текущей цене."""
