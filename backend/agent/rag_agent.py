@@ -1,40 +1,40 @@
-from llm import create_erag_api
 import json
+import logging
+
+from agent.base_agent import BaseAgent
+from agent.contracts import FormattedContext
+
+logger = logging.getLogger(__name__)
 
 
-class RAGReasonerAgent:
+class RAGReasonerAgent(BaseAgent):
+    def __init__(self):
+        super().__init__("reasoner")
 
+    def execute(self, user_query: str, context: FormattedContext) -> str:
+        logger.info(f"[RAG] контекст: {context.total_chars} символов, усечён={context.was_truncated}")
 
-    def __init__(self, llm_model="gemini"):
-        self.llm = create_erag_api(api_type="gemini", model="gemini-2.5-flash")
+        quality_note = ""
+        if context.was_truncated:
+            quality_note = "\n⚠️ Контекст был сокращён. Некоторые детали могут отсутствовать.\n"
 
-    def generate_answer(self, user_query, context_data):
-        """
-        Формирует осмысленный ответ для пользователя на основе контекста.
-        """
-        # Преобразуем контекст в красивый JSON-текст
-        context_str = json.dumps(context_data, ensure_ascii=False, indent=2)
-
-        system_prompt = (
-            "Ты — эксперт по криптовалютам и финансовым рынкам. "
-            "Используй приведённые ниже данные (контекст), чтобы ответить на вопрос пользователя. "
-            "Если данных недостаточно — сообщи об этом, не придумывай ответ. "
-            "Если данные есть, но за более короткий период , то отвечай по нему "
-            "Формулируй ответ ясно, аналитически и по делу, можно с коротким выводом в конце."
-        )
-
-        llm_prompt = (
-            f"{system_prompt}\n\n"
-            f"Контекстные данные:\n{context_str}\n\n"
-            f"Вопрос пользователя:\n{user_query}\n\n"
-            f"Ответ:"
+        prompt = (
+            "Ты — эксперт по криптовалютам.\n\n"
+            "ПРАВИЛА:\n"
+            "1. Используй ТОЛЬКО предоставленные данные\n"
+            "2. Упоминай конкретные числа\n"
+            "3. В конце дай краткий вывод\n"
+            "4. Если данных недостаточно — скажи об этом\n"
+            "5. Отвечай на языке запроса\n"
+            f"{quality_note}\n"
+            f"ДАННЫЕ:\n{context.context_str}\n\n"
+            f"ВОПРОС: {user_query}\n\nОТВЕТ:"
         )
 
         try:
-            response = self.llm.chat([{"role": "user", "content": llm_prompt}])
+            response = self._call_llm(prompt, temperature=0.3)
+            logger.info(f"[RAG] Ответ: {len(response)} символов")
+            return response
         except Exception as e:
-            return f"Ошибка LLM при генерации ответа: {e}"
-
-        print("\n=== Финальный ответ LLM ===")
-        print(response)
-        return response
+            logger.error(f"[RAG] Ошибка: {e}")
+            return f"Ошибка генерации ответа: {e}"
