@@ -1,41 +1,3 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8"/>
-  <title>Автодополнение</title>
-  <style>
-    body { font-family: sans-serif; padding: 40px; background: #f5f5f5; }
-    .wrap { position: relative; max-width: 400px; }
-    input {
-      width: 100%; padding: 10px; font-size: 16px;
-      border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;
-    }
-    ul {
-      position: absolute; top: 100%; left: 0; right: 0;
-      background: #fff; border: 1px solid #ccc; border-top: none;
-      border-radius: 0 0 6px 6px; list-style: none;
-      margin: 0; padding: 0; display: none; z-index: 10;
-    }
-    ul.open { display: block; }
-    li { padding: 9px 12px; cursor: pointer; font-size: 15px; display: flex; align-items: center; gap: 8px; }
-    li:hover, li.active { background: #eef; }
-    li mark { background: none; color: #4a90d9; font-weight: 600; }
-    .badge {
-      font-size: 10px; padding: 1px 5px; border-radius: 3px;
-      flex-shrink: 0; font-weight: 600; letter-spacing: 0.03em;
-    }
-    .badge-crypto { background: #fff3cd; color: #856404; }
-    .badge-wiki   { background: #e8f0fe; color: #1a56db; }
-  </style>
-</head>
-<body>
-
-<div class="wrap">
-  <input id="q" type="text" placeholder="Введите термин..."/>
-  <ul id="list"></ul>
-</div>
-
-<script>
 const CRYPTO = [
   "Абстракция аккаунта","Автоматический маркет-мейкер","АММ","Авторитетный мастернод",
   "Агрегатор DeFi","Адаптивный шардинг","Адрес","Аирдроп","Алгоритмический стейблкоин",
@@ -77,16 +39,15 @@ const CRYPTO = [
   "PoA","PoS","PoW","Rug Pull","SegWit"
 ];
 
-const q    = document.getElementById('q');
-const list = document.getElementById('list');
+const input = document.getElementById('chatInput');
+const list  = document.getElementById('autocompleteList');
 let active = -1, matches = [], timer, wikiCtrl;
 
-q.addEventListener('input', () => {
-  const val = q.value.split(/\s+/).pop();
-  if (val.length < 1) { close(); return; }
+input.addEventListener('input', () => {
+  const val = input.value.split(/\s+/).pop();
+  if (val.length < 1) { closeList(); return; }
 
-  // 1. крипто — мгновенно
-  const lower = val.toLowerCase();
+  const lower  = val.toLowerCase();
   const crypto = CRYPTO.filter(t => t.toLowerCase().startsWith(lower)).slice(0, 6);
 
   clearTimeout(timer);
@@ -94,7 +55,6 @@ q.addEventListener('input', () => {
 
   render(crypto, [], val);
 
-  // 2. Wikipedia — догружаем если крипто < 6
   if (crypto.length < 6) {
     timer = setTimeout(() => fetchWiki(val, crypto), 350);
   }
@@ -105,7 +65,7 @@ async function fetchWiki(val, crypto) {
   try {
     const url = `https://ru.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(val)}&limit=20&format=json&origin=*`;
     const res  = await fetch(url, { signal: wikiCtrl.signal });
-    const data = await res.json(); // массив заголовков статей
+    const data = await res.json();
     const seen = new Set(crypto.map(s => s.toLowerCase()));
     const wiki = data[1]
       .map(s => s.split(/[\s,.(]/)[0])
@@ -119,11 +79,11 @@ async function fetchWiki(val, crypto) {
 function render(crypto, wiki, val) {
   matches = [...crypto, ...wiki];
   active  = -1;
-  if (!matches.length) { close(); return; }
+  if (!matches.length) { closeList(); return; }
 
   list.innerHTML = [
-    ...crypto.map((t, i)           => item(t, val, i,              'crypto')),
-    ...wiki  .map((t, i)           => item(t, val, i + crypto.length, 'wiki')),
+    ...crypto.map((t, i) => item(t, val, i,              'crypto')),
+    ...wiki  .map((t, i) => item(t, val, i + crypto.length, 'wiki')),
   ].join('');
   list.className = 'open';
 }
@@ -141,10 +101,11 @@ function item(t, val, i, type) {
 }
 
 function pick(i) {
-  const parts = q.value.split(/\s+/);
+  const parts = input.value.split(/\s+/);
   parts[parts.length - 1] = matches[i];
-  q.value = parts.join(' ') + ' ';
-  close(); q.focus();
+  input.value = parts.join(' ') + ' ';
+  closeList();
+  input.focus();
 }
 
 list.addEventListener('mousedown', e => {
@@ -152,11 +113,11 @@ list.addEventListener('mousedown', e => {
   if (li) pick(+li.dataset.i);
 });
 
-q.addEventListener('keydown', e => {
+input.addEventListener('keydown', e => {
   if (e.key === 'ArrowDown')  { e.preventDefault(); setActive(active + 1); }
   if (e.key === 'ArrowUp')    { e.preventDefault(); setActive(active - 1); }
-  if (e.key === 'Enter' && active >= 0) pick(active);
-  if (e.key === 'Escape') close();
+  if (e.key === 'Enter' && active >= 0) { e.preventDefault(); pick(active); }
+  if (e.key === 'Escape') closeList();
 });
 
 function setActive(i) {
@@ -165,8 +126,13 @@ function setActive(i) {
   lis.forEach((el, j) => el.classList.toggle('active', j === active));
 }
 
-function close() { list.className = ''; list.innerHTML = ''; active = -1; matches = []; }
-document.addEventListener('click', e => { if (!e.target.closest('.wrap')) close(); });
-</script>
-</body>
-</html>
+function closeList() {
+  list.className = '';
+  list.innerHTML = '';
+  active  = -1;
+  matches = [];
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.wrap')) closeList();
+});

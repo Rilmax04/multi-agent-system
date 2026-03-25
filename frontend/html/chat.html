@@ -13,6 +13,7 @@
 
   <!-- Page styles -->
   <link rel="stylesheet" href="../css/chat.css">
+  <link rel="stylesheet" href="../css/autocomplete.css">
 </head>
 
 <body>
@@ -43,12 +44,15 @@
 
           <!-- Input -->
           <div class="d-flex gap-2">
-            <input
-              id="chatInput"
-              type="text"
-              class="form-control"
-              placeholder="Ask a question about cryptocurrencies..."
-            />
+            <div class="wrap">
+              <input
+                id="chatInput"
+                type="text"
+                class="form-control"
+                placeholder="Ask a question about cryptocurrencies..."
+              />
+              <ul id="autocompleteList"></ul>
+            </div>
             <button id="sendBtn" class="btn btn-primary d-flex align-items-center gap-2">
               <i class="bi bi-send"></i>
               Ask
@@ -74,6 +78,7 @@
 
 <!-- Page logic -->
 <script src="../js/chat.js"></script>
+<script src="../js/autocomplete.js"></script>
 
 <!-- Navbar loader -->
 <script src="../js/navbar-loader.js"></script>
