@@ -91,7 +91,7 @@ function renderMessages() {
    SEND MESSAGE
 ========================= */
 
-function sendMessage() {
+async function sendMessage() {
   const input = document.getElementById("chatInput");
   const text = input.value.trim();
   if (!text) return;
@@ -115,18 +115,55 @@ function sendMessage() {
 
   renderMessages();
 
-  // fake AI response
-  setTimeout(() => {
-    messages = messages.filter(msg => msg.id !== loadingId);
+  try {
+    const res = await fetch("http://127.0.0.1:8000/ask", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify({ question: text }) // TODO: markdown
+    });
 
+    let aiContent = "";
+
+    if (res.ok) {
+      const data = await res.json();
+      aiContent = data.answer ?? "";
+    } else if (res.status === 422) {
+      const data = await res.json().catch(() => null);
+      const detail = data?.detail;
+
+      if (Array.isArray(detail) && detail.length) {
+        aiContent = `Validation Error: ${detail.map(d => d.msg).join("; ")}`;
+      } else {
+        aiContent = "Validation Error";
+      }
+    } else {
+      const data = await res.json().catch(() => null);
+      aiContent = data?.detail || `Request failed with status ${res.status}`;
+    }
+
+    messages = messages.filter(msg => msg.id !== loadingId);
     messages.push({
       id: Date.now() + 1,
       type: "ai",
-      content: "Thank you for your question. I'm analyzing the cryptocurrency data to provide you with an accurate answer..."
+      content: aiContent || "Ответ не сформирован"
     });
 
     renderMessages();
-  }, 1000);
+  } catch (err) {
+    console.error(err);
+
+    messages = messages.filter(msg => msg.id !== loadingId);
+    messages.push({
+      id: Date.now() + 1,
+      type: "ai",
+      content: "Ошибка связи с бэкендом. Попробуйте ещё раз."
+    });
+
+    renderMessages();
+  }
 }
 
 document.getElementById("sendBtn").onclick = sendMessage;
