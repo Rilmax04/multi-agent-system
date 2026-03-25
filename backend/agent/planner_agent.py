@@ -1,61 +1,98 @@
-from llm import create_erag_api
-import ast
+import json
+import re
+import logging
+from typing import List
+
+from agent.base_agent import BaseAgent
+from agent.contracts import PlanResult, VALID_COINS, COIN_ALIASES, PERIOD_KEYWORDS, AllowedFunction
+
+logger = logging.getLogger(__name__)
 
 
-class PlannerAgent:
+class PlannerAgent(BaseAgent):
+    def __init__(self):
+        super().__init__("planner")
 
-    def __init__(self, llm_model="gemini"):
-        self.llm = create_erag_api(api_type="gemini", model="gemini-2.5-flash")
-
-    def analyze_query(self, user_query: str):
-
-        system_prompt_functions = (
-            "Ты агент, который определяет, какие функции нужно вызвать "
-            "для сбора крипто-данных, чтобы ответить на запрос пользователя. "
-            "Верни только Python список функций без аргументов. "
-            "Допустимые функции: "
-            "'coingecko_current_price', 'coingecko_historical_prices', "
-            "'coingecko_top_coins', 'coinmarketcap_latest'.\n"
-            "Пример ответа: ['coingecko_current_price', 'coingecko_historical_prices']\n"
-            "Возвращай только список, без текста."
-        )
-
-        llm_prompt_functions = f"{system_prompt_functions}\n\nПользовательский запрос: {user_query}"
+    def execute(self, user_query: str) -> PlanResult:
+        logger.info(f"[Planner] Запрос: {user_query}")
+        functions = self._determine_functions(user_query)
+        coins = self._determine_coins(user_query)
+        period = self._determine_period(user_query)
 
         try:
-            llm_response_functions = self.llm.chat([{"role": "user", "content": llm_prompt_functions}])
-            print(f"Ответ LLM (функции): {llm_response_functions}")
-            functions_to_call = ast.literal_eval(llm_response_functions)
-            if not isinstance(functions_to_call, list):
-                raise ValueError("Ответ не является списком функций")
+            plan = PlanResult(functions=functions, coins=coins,
+                              period_days=period, original_query=user_query)
         except Exception as e:
-            print(f"Ошибка при анализе функций: {e}")
-            functions_to_call = []
+            logger.warning(f"[Planner] Ошибка валидации: {e}, используем значения по умолчанию")
+            plan = PlanResult(functions=["coingecko_current_price"],
+                              coins=["bitcoin"], period_days=7, original_query=user_query)
 
-        system_prompt_coins = (
-            "Ты агент, который определяет, про какие криптовалюты нужно собрать данные "
-            "на основе запроса пользователя. "
-            "Верни список идентификаторов монет (CoinGecko IDs) в виде Python списка, например: ['bitcoin', 'ethereum'].\n"
-            "Если конкретные монеты не указаны — верни ['bitcoin'].\n"
-            "Возвращай только список, без лишнего текста.\n\n"
-            "Список допустимых CoinGecko ID, которые можно использовать:\n"
-            "['bitcoin', 'ethereum', 'tether', 'bnb', 'solana', 'ripple', 'dogecoin', 'cardano', 'tron', 'avalanche', "
-            "'shiba-inu', 'polkadot', 'litecoin', 'chainlink', 'uniswap', 'stellar', 'monero', 'near', 'cosmos', "
-            "'vechain', 'filecoin', 'aptos', 'hedera', 'maker', 'immutable', 'arbitrum', 'optimism', 'injective', "
-            "'render-token', 'the-graph', 'quant-network', 'aave', 'algorand', 'elrond-erd-2', 'fantom', 'tezos', "
-            "'theta-token', 'chiliz', 'flow', 'eos', 'neo', 'dash', 'kusama', 'iota', 'bitcoin-cash', 'internet-computer']\n\n"
-            "Используй только эти ID — не выдумывай новые."
-        )
-
-        llm_prompt_coins = f"{system_prompt_coins}\n\nПользовательский запрос: {user_query}"
-
-        try:
-            llm_response_coins = self.llm.chat([{"role": "user", "content": llm_prompt_coins}])
-            coins_to_fetch = ast.literal_eval(llm_response_coins)
-            if not isinstance(coins_to_fetch, list):
-                raise ValueError("Ответ не является списком монет")
-        except Exception as e:
-            print(f"Ошибка при анализе монет: {e}")
-            coins_to_fetch = ["bitcoin"]
-        plan = {"functions": functions_to_call, "coins": coins_to_fetch}
+        logger.info(f"[Planner] План: f={plan.functions}, c={plan.coins}, p={plan.period_days}д")
         return plan
+
+    def _determine_functions(self, query: str) -> List[str]:
+        allowed = [f.value for f in AllowedFunction]
+        prompt = (
+            f"Определи функции API для ответа на запрос.\n"
+            f"ДОСТУПНЫЕ: {json.dumps(allowed)}\n"
+            f"ПРАВИЛА:\n"
+            f"- 'цена', 'стоит' → ['coingecko_current_price']\n"
+            f"- 'динамика', 'история', 'тренд' → ['coingecko_historical_prices']\n"
+            f"- 'топ', 'лидеры', 'рейтинг' → ['coingecko_top_coins']\n"
+            f"- Верни ТОЛЬКО JSON-список\n\n"
+            f"Запрос: {query}"
+        )
+        response = self._call_llm(prompt)
+        functions = self._parse_list(response)
+        valid = [f for f in functions if f in allowed]
+        return valid or ["coingecko_current_price"]
+
+    def _determine_coins(self, query: str) -> List[str]:
+        query_lower = query.lower()
+        found = set()
+        for alias, coin_id in COIN_ALIASES.items():
+            if alias in query_lower:
+                found.add(coin_id)
+        for coin in VALID_COINS:
+            if coin in query_lower:
+                found.add(coin)
+        if found:
+            return list(found)
+
+        prompt = (
+            f"Определи криптовалюты из запроса.\n"
+            f"Допустимые: {json.dumps(VALID_COINS[:20])}...\n"
+            f"Верни JSON-список. Если не ясно — [\"bitcoin\"].\n"
+            f"Запрос: {query}"
+        )
+        try:
+            response = self._call_llm(prompt)
+            coins = self._parse_list(response)
+            valid = [c for c in coins if c in VALID_COINS]
+            return valid or ["bitcoin"]
+        except Exception:
+            return ["bitcoin"]
+
+    def _determine_period(self, query: str) -> int:
+        query_lower = query.lower()
+        for kw, days in PERIOD_KEYWORDS.items():
+            if kw in query_lower:
+                return days
+        match = re.search(r'(\d+)\s*(?:дн|день|дня)', query_lower)
+        if match:
+            d = int(match.group(1))
+            if 0 < d <= 365: return d
+        return 7
+
+    @staticmethod
+    def _parse_list(text: str) -> list:
+        match = re.search(r'\[.*?\]', text, re.DOTALL)
+        if match:
+            s = match.group().replace("'", '"')
+            try:
+                r = json.loads(s)
+                if isinstance(r, list):
+                    return [str(i) for i in r]
+            except json.JSONDecodeError:
+                pass
+        return []
