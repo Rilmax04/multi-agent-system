@@ -4,6 +4,7 @@
 
 const BACKEND_URL = "http://127.0.0.1:8000";
 const LAST_TRACE_STORAGE_KEY = "rag:last_trace";
+const CHAT_MESSAGES_STORAGE_KEY = "rag:chat_messages";
 
 /* =========================
    CHAT STATE
@@ -17,6 +18,35 @@ let messages = [
       "Hello! I'm your cryptocurrency analysis assistant. Ask me anything about crypto markets, prices, trends, or specific coins."
   }
 ];
+
+function safeJsonParse(text) {
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    return null;
+  }
+}
+
+function getPersistableMessages(msgs) {
+  // Do not persist transient UI states.
+  return (Array.isArray(msgs) ? msgs : []).filter(m => m?.content !== "loading");
+}
+
+function persistMessages() {
+  try {
+    localStorage.setItem(
+      CHAT_MESSAGES_STORAGE_KEY,
+      JSON.stringify(getPersistableMessages(messages))
+    );
+  } catch (_) {}
+}
+
+function restoreMessages() {
+  const saved = safeJsonParse(localStorage.getItem(CHAT_MESSAGES_STORAGE_KEY) || "");
+  if (Array.isArray(saved) && saved.length) {
+    messages = saved;
+  }
+}
 
 const suggestedActions = [
   { label: "Compare BTC and ETH", icon: "bi-arrow-left-right" },
@@ -122,6 +152,7 @@ async function sendMessage() {
     type: "user",
     content: text
   });
+  persistMessages();
 
   input.value = "";
   renderMessages();
@@ -183,6 +214,7 @@ async function sendMessage() {
       type: "ai",
       content: aiContent || "Ответ не сформирован"
     });
+    persistMessages();
 
     renderMessages();
   } catch (err) {
@@ -194,6 +226,7 @@ async function sendMessage() {
       type: "ai",
       content: "Ошибка связи с бэкендом. Попробуйте ещё раз."
     });
+    persistMessages();
 
     renderMessages();
   }
@@ -354,5 +387,6 @@ async function loadMarket() {
   renderMarket();
 }
 
+restoreMessages();
 renderMessages();
 loadMarket();
