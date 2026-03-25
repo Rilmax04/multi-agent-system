@@ -47,6 +47,20 @@ body {
   background:#f8f9fa;
   border-radius:10px;
 }
+
+.loader {
+  width: 18px;
+  height: 18px;
+  border: 3px solid #dee2e6;
+  border-top: 3px solid #0d6efd;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
 </style>
 </head>
 
@@ -189,7 +203,11 @@ function renderMessages() {
         ? "message-user"
         : "message-ai");
 
-    bubble.textContent = msg.content;
+    if (msg.content === "loading") {
+      bubble.innerHTML = '<div class="loader"></div>';
+    } else {
+      bubble.textContent = msg.content;
+    }
 
     wrapper.appendChild(bubble);
     chatBox.appendChild(wrapper);
@@ -217,8 +235,21 @@ function sendMessage() {
   input.value="";
   renderMessages();
 
+  const loadingId = Date.now()+100;
+
+  messages.push({
+    id: loadingId,
+    type:"ai",
+    content:"loading"
+  });
+
+  renderMessages();
+
   // fake AI response
   setTimeout(() => {
+
+    messages = messages.filter(msg => msg.id !== loadingId);
+
     messages.push({
       id: Date.now()+1,
       type:"ai",
