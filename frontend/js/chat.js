@@ -1,22 +1,20 @@
 /* =========================
-   MOCK DATA (dynamic JSON)
+   CONFIG
+========================= */
+
+const BACKEND_URL = "http://127.0.0.1:8000";
+const LAST_TRACE_STORAGE_KEY = "rag:last_trace";
+
+/* =========================
+   CHAT STATE
 ========================= */
 
 let messages = [
   {
     id: 1,
     type: "ai",
-    content: "Hello! I'm your cryptocurrency analysis assistant. Ask me anything about crypto markets, prices, trends, or specific coins."
-  },
-  {
-    id: 2,
-    type: "user",
-    content: "What is the current Bitcoin price?"
-  },
-  {
-    id: 3,
-    type: "ai",
-    content: "Bitcoin (BTC) is currently trading at $45,234.50 USD, with a 24-hour change of +2.3%. The market cap is $884.5B and the 24-hour volume is $28.3B."
+    content:
+      "Hello! I'm your cryptocurrency analysis assistant. Ask me anything about crypto markets, prices, trends, or specific coins."
   }
 ];
 
@@ -26,30 +24,53 @@ const suggestedActions = [
   { label: "Analyze volatility", icon: "bi-activity" }
 ];
 
-const marketData = {
-  coins: [
-    {
-      name: "Bitcoin (BTC)",
-      change: "+2.3%",
-      price: "$45,234.50",
-      volume: "$28.3B",
-      positive: true
-    },
-    {
-      name: "Ethereum (ETH)",
-      change: "+1.8%",
-      price: "$2,456.30",
-      volume: "$15.7B",
-      positive: true
-    }
-  ],
-  trend: "Bullish momentum across major cryptocurrencies",
-  stats: {
-    marketCap: "$1.82T",
-    volume24h: "$89.4B",
-    dominance: "48.6%"
+/* =========================
+   MARKET DATA (real backend)
+========================= */
+
+let marketData = null;
+
+function formatUsdCompact(value) {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 2
+  }).format(Number(value));
+}
+
+function formatUsd(value) {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2
+  }).format(Number(value));
+}
+
+function formatPercent(value) {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  const v = Number(value);
+  const sign = v > 0 ? "+" : "";
+  return `${sign}${v.toFixed(2)}%`;
+}
+
+async function fetchMarketSnapshot({ coins = ["bitcoin", "ethereum"], source = null } = {}) {
+  const params = new URLSearchParams();
+  params.set("coins", coins.join(","));
+  if (source) params.set("source", source);
+
+  const res = await fetch(`${BACKEND_URL}/market/prices?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" }
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || `Market request failed (${res.status})`);
   }
-};
+  return res.json();
+}
 
 
 /* =========================
@@ -116,13 +137,13 @@ async function sendMessage() {
   renderMessages();
 
   try {
-    const res = await fetch("http://127.0.0.1:8000/ask", {
+    const res = await fetch(`${BACKEND_URL}/ask`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json"
       },
-      body: JSON.stringify({ question: text }) // TODO: markdown
+      body: JSON.stringify({ question: text })
     });
 
     let aiContent = "";
@@ -130,6 +151,18 @@ async function sendMessage() {
     if (res.ok) {
       const data = await res.json();
       aiContent = data.answer ?? "";
+
+      // Save last trace for Workflow page (real backend data)
+      try {
+        const payload = {
+          question: text,
+          answer: data.answer ?? "",
+          total_time_ms: data.total_time_ms ?? null,
+          trace: data.trace ?? null,
+          saved_at: Date.now()
+        };
+        localStorage.setItem(LAST_TRACE_STORAGE_KEY, JSON.stringify(payload));
+      } catch (_) {}
     } else if (res.status === 422) {
       const data = await res.json().catch(() => null);
       const detail = data?.detail;
@@ -205,6 +238,13 @@ suggestedActions.forEach(action => {
 const marketContainer = document.getElementById("marketInfo");
 
 function renderMarket() {
+  if (!marketData) {
+    marketContainer.innerHTML = `
+      <div class="text-muted small">Loading market data…</div>
+    `;
+    return;
+  }
+
   const coinsHTML = marketData.coins.map(c => `
     <div class="p-3 mb-3 market-card">
       <div class="d-flex justify-content-between mb-1">
@@ -253,5 +293,66 @@ function renderMarket() {
    INIT
 ========================= */
 
+async function loadMarket() {
+  marketData = null;
+  renderMarket();
+
+  try {
+    const prices = await fetchMarketSnapshot({ coins: ["bitcoin", "ethereum"] });
+    const btc = prices?.bitcoin;
+    const eth = prices?.ethereum;
+    const coins = [btc, eth].filter(Boolean).map(p => {
+      const isPositive = (p.change_24h_percent ?? 0) >= 0;
+      const symbol = p.coin_id === "bitcoin" ? "BTC" : p.coin_id === "ethereum" ? "ETH" : p.coin_id?.toUpperCase();
+      const name = p.coin_id === "bitcoin" ? "Bitcoin" : p.coin_id === "ethereum" ? "Ethereum" : p.coin_id;
+      return {
+        name: `${name} (${symbol})`,
+        change: formatPercent(p.change_24h_percent),
+        price: formatUsd(p.price_usd),
+        volume: formatUsdCompact(p.volume_24h_usd),
+        positive: isPositive,
+        marketCapUsd: p.market_cap_usd ?? null
+      };
+    });
+
+    const totalMarketCap =
+      (btc?.market_cap_usd ?? 0) + (eth?.market_cap_usd ?? 0);
+    const totalVolume =
+      (btc?.volume_24h_usd ?? 0) + (eth?.volume_24h_usd ?? 0);
+    const btcDominance =
+      totalMarketCap > 0 && btc?.market_cap_usd != null
+        ? (btc.market_cap_usd / totalMarketCap) * 100
+        : null;
+
+    const avgChange =
+      ((btc?.change_24h_percent ?? 0) + (eth?.change_24h_percent ?? 0)) / 2;
+    const trend =
+      avgChange > 0.5
+        ? "Bullish momentum across major cryptocurrencies"
+        : avgChange < -0.5
+          ? "Bearish pressure across major cryptocurrencies"
+          : "Mixed momentum across major cryptocurrencies";
+
+    marketData = {
+      coins,
+      trend,
+      stats: {
+        marketCap: formatUsdCompact(totalMarketCap),
+        volume24h: formatUsdCompact(totalVolume),
+        dominance: btcDominance == null ? "—" : `${btcDominance.toFixed(1)}%`
+      }
+    };
+  } catch (e) {
+    marketData = {
+      coins: [],
+      trend: "Market data unavailable",
+      stats: { marketCap: "—", volume24h: "—", dominance: "—" },
+      error: String(e?.message || e)
+    };
+  }
+
+  renderMarket();
+}
+
 renderMessages();
-renderMarket();
+loadMarket();

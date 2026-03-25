@@ -1,70 +1,53 @@
 /* =========================
-   MOCK JSON WITH CHART DATA
+   CONFIG + STATE (real backend)
 ========================= */
 
+const BACKEND_URL = "http://127.0.0.1:8000";
+
 const analyticsData = {
-  selectedCoin: "BTC",
-
-  coins: [
-    {
-      name: "Bitcoin",
-      symbol: "BTC",
-      price: "$45,234.50",
-      change: "+2.3%",
-      marketCap: "$884.5B",
-      volume: "$28.3B",
-      positive: true,
-      priceHistory: [42000, 42500, 43000, 43800, 44100, 44700, 45234],
-      marketCapHistory: [820, 830, 845, 860, 870, 880, 884]
-    },
-    {
-      name: "Ethereum",
-      symbol: "ETH",
-      price: "$2,456.30",
-      change: "+1.8%",
-      marketCap: "$295.2B",
-      volume: "$15.7B",
-      positive: true,
-      priceHistory: [2100, 2180, 2230, 2300, 2360, 2410, 2456],
-      marketCapHistory: [250, 258, 265, 272, 280, 289, 295]
-    },
-    {
-      name: "Cardano",
-      symbol: "ADA",
-      price: "$0.54",
-      change: "-0.5%",
-      marketCap: "$18.9B",
-      volume: "$324.5M",
-      positive: false,
-      priceHistory: [0.60, 0.59, 0.58, 0.57, 0.56, 0.55, 0.54],
-      marketCapHistory: [22, 21.5, 21, 20.4, 19.8, 19.2, 18.9]
-    },
-    {
-      name: "Solana",
-      symbol: "SOL",
-      price: "$98.45",
-      change: "+4.2%",
-      marketCap: "$41.2B",
-      volume: "$2.1B",
-      positive: true,
-      priceHistory: [82, 85, 88, 90, 94, 96, 98],
-      marketCapHistory: [32, 34, 36, 37.5, 39, 40.5, 41.2]
-    },
-    {
-      name: "Ripple",
-      symbol: "XRP",
-      price: "$0.62",
-      change: "-1.2%",
-      marketCap: "$33.5B",
-      volume: "$1.8B",
-      positive: false,
-      priceHistory: [0.70, 0.69, 0.67, 0.66, 0.65, 0.63, 0.62],
-      marketCapHistory: [38, 37, 36, 35.5, 34.7, 34, 33.5]
-    }
-  ],
-
-  labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+  // coin_id from backend (/market/top and /market/history/{coin_id})
+  selectedCoinId: null,
+  coins: [],
+  labels: []
 };
+
+function formatUsd(value) {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2
+  }).format(Number(value));
+}
+
+function formatUsdCompact(value) {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 2
+  }).format(Number(value));
+}
+
+function formatPercent(value) {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  const v = Number(value);
+  const sign = v > 0 ? "+" : "";
+  return `${sign}${v.toFixed(2)}%`;
+}
+
+async function apiGet(path) {
+  const res = await fetch(`${BACKEND_URL}${path}`, {
+    method: "GET",
+    headers: { Accept: "application/json" }
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || `Request failed (${res.status})`);
+  }
+  return res.json();
+}
 
 
 /* =========================
@@ -75,8 +58,8 @@ const select = document.getElementById("coinSelect");
 
 function renderSelect() {
   select.innerHTML = analyticsData.coins.map(c => `
-    <option value="${c.symbol}"
-      ${c.symbol === analyticsData.selectedCoin ? "selected" : ""}>
+    <option value="${c.coin_id}"
+      ${c.coin_id === analyticsData.selectedCoinId ? "selected" : ""}>
       ${c.name} (${c.symbol})
     </option>
   `).join("");
@@ -96,14 +79,14 @@ function renderTable() {
         <div class="fw-medium">${c.name}</div>
         <div class="text-muted small">${c.symbol}</div>
       </td>
-      <td class="text-end fw-medium">${c.price}</td>
+      <td class="text-end fw-medium">${formatUsd(c.price_usd)}</td>
       <td class="text-end">
-        <span class="${c.positive ? 'text-success' : 'text-danger'} fw-medium">
-          ${c.change}
+        <span class="${(c.change_24h_percent ?? 0) >= 0 ? 'text-success' : 'text-danger'} fw-medium">
+          ${formatPercent(c.change_24h_percent)}
         </span>
       </td>
-      <td class="text-end text-secondary">${c.marketCap}</td>
-      <td class="text-end text-secondary">${c.volume}</td>
+      <td class="text-end text-secondary">${formatUsdCompact(c.market_cap_usd)}</td>
+      <td class="text-end text-secondary">${formatUsdCompact(c.volume_24h_usd)}</td>
     </tr>
   `).join("");
 }
@@ -117,9 +100,8 @@ let priceChart;
 let marketCapChart;
 
 function renderCharts() {
-  const coin = analyticsData.coins.find(
-    c => c.symbol === analyticsData.selectedCoin
-  );
+  const coin = analyticsData.coins.find(c => c.coin_id === analyticsData.selectedCoinId);
+  if (!coin) return;
 
   document.getElementById("priceChartTitle")
     .textContent = `Price Chart (${coin.symbol})`;
@@ -135,7 +117,7 @@ function renderCharts() {
         labels: analyticsData.labels,
         datasets: [{
           label: "Price",
-          data: coin.priceHistory,
+          data: coin.priceHistory ?? [],
           borderWidth: 2,
           tension: 0.3
         }]
@@ -155,7 +137,7 @@ function renderCharts() {
         labels: analyticsData.labels,
         datasets: [{
           label: "Market Cap (B$)",
-          data: coin.marketCapHistory,
+          data: coin.marketCapHistory ?? [],
           borderWidth: 1
         }]
       },
@@ -173,8 +155,8 @@ function renderCharts() {
 ========================= */
 
 document.getElementById("applyBtn").onclick = () => {
-  analyticsData.selectedCoin = select.value;
-  renderCharts();
+  analyticsData.selectedCoinId = select.value;
+  loadSelectedCoinSeries().catch(console.error);
 };
 
 
@@ -182,6 +164,70 @@ document.getElementById("applyBtn").onclick = () => {
    INIT
 ========================= */
 
-renderSelect();
-renderTable();
-renderCharts();
+async function loadTopCoins() {
+  const top = await apiGet(`/market/top?limit=10`);
+
+  // Normalize to the fields we use in UI.
+  analyticsData.coins = (Array.isArray(top) ? top : []).map(c => ({
+    rank: c.rank,
+    coin_id: c.coin_id,
+    symbol: c.symbol,
+    name: c.name,
+    price_usd: c.price_usd,
+    market_cap_usd: c.market_cap_usd,
+    change_24h_percent: c.change_24h_percent,
+    source: c.source,
+    // will be filled by loadSelectedCoinSeries
+    priceHistory: [],
+    marketCapHistory: []
+  }));
+
+  if (!analyticsData.selectedCoinId && analyticsData.coins.length) {
+    analyticsData.selectedCoinId = analyticsData.coins[0].coin_id;
+  }
+
+  renderSelect();
+  renderTable();
+}
+
+function buildLabelsFromTimestamps(timestampsSec) {
+  return timestampsSec.map(ts => {
+    const d = new Date(ts * 1000);
+    return d.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
+  });
+}
+
+async function loadSelectedCoinSeries() {
+  const coinId = analyticsData.selectedCoinId;
+  if (!coinId) return;
+
+  const hist = await apiGet(`/market/history/${encodeURIComponent(coinId)}?days=7`);
+  const points = Array.isArray(hist?.prices) ? hist.prices : [];
+
+  const timestamps = points.map(p => p.timestamp);
+  const prices = points.map(p => p.price);
+  analyticsData.labels = buildLabelsFromTimestamps(timestamps);
+
+  const coin = analyticsData.coins.find(c => c.coin_id === coinId);
+  if (coin) {
+    coin.priceHistory = prices;
+
+    // Backend does not provide market cap history in /market/history,
+    // so we display current market cap repeated across the period.
+    const capB = coin.market_cap_usd != null ? Number(coin.market_cap_usd) / 1e9 : null;
+    coin.marketCapHistory = capB == null ? prices.map(() => null) : prices.map(() => capB);
+  }
+
+  renderCharts();
+}
+
+async function init() {
+  try {
+    await loadTopCoins();
+    await loadSelectedCoinSeries();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+init();
