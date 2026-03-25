@@ -1,81 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AI Explain Workflow</title>
-
-  <!-- Bootstrap -->
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  />
-
-  <!-- Bootstrap Icons -->
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
-    rel="stylesheet"
-  />
-
-  <style>
-    body {
-      background: #f8f9fa;
-    }
-
-    .step-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      display: flex;
-      /*дочерние элементы по вертикали*/
-      align-items: center;
-      /*дочерние элементы по горизонтали*/
-      justify-content: center;
-      font-size: 20px;
-      flex-shrink: 0;
-    }
-
-    .agent-badge {
-      font-family: monospace;
-      font-size: 12px;
-      font-weight: 600;
-      padding: 4px 8px;
-      border-radius: 6px;
-    }
-
-    .detail-box {
-      border-radius: 10px;
-      padding: 14px;
-      font-family: monospace;
-      font-size: 14px;
-    }
-  </style>
-</head>
-<body>
-
-<div id="navbar"></div>
-
-<div class="container py-5" style="max-width:900px">
-
-  <!-- Header -->
-  <div class="card mb-4">
-    <div class="card-body">
-      <h4 class="card-title">How the System Reached the Answer</h4>
-      <p class="text-muted small mb-0">
-        Trace the AI agent workflow from user input to final response
-      </p>
-    </div>
-  </div>
-
-  <!-- Steps container -->
-  <div id="stepsContainer" class="position-relative"></div>
-
-  <!-- Summary -->
-  <div id="summaryContainer"></div>
-
-</div>
-
-<script>
 /* =========================
    MOCK JSON (backend later)
 ========================= */
@@ -143,16 +65,8 @@ const workflowData = {
 const container = document.getElementById("stepsContainer");
 
 workflowData.steps.forEach((step, index) => {
-
   const wrapper = document.createElement("div");
   wrapper.className = "mb-4 position-relative";
-
-  // // timeline line // TODO создать класс timeline-line
-  // if (index < workflowData.steps.length - 1) {
-  //   const line = document.createElement("div");
-  //   line.className = "timeline-line";
-  //   wrapper.appendChild(line);
-  // }
 
   const detailsHTML = step.details
     .map(d => `
@@ -226,22 +140,3 @@ summary.innerHTML = `
     </div>
   </div>
 `;
-</script>
-
-<script>
-fetch("navbar.html")
-  .then(res => res.text())
-  .then(data => {
-    document.getElementById("navbar").innerHTML = data;
-    const links = document.querySelectorAll(".navbar-tabs a");
-
-    links.forEach(link => {
-      if (window.location.pathname.includes(link.getAttribute("href"))) {
-        link.classList.add("active");
-      }
-    });
-  });
-</script>
-
-</body>
-</html>
