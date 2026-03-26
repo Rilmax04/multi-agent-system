@@ -111,7 +111,6 @@ const chatBox = document.getElementById("chatMessages");
 
 function renderMessages() {
   chatBox.innerHTML = "";
-
   messages.forEach(msg => {
     const wrapper = document.createElement("div");
     wrapper.className = "d-flex " + (msg.type === "user"
@@ -119,21 +118,21 @@ function renderMessages() {
       : "justify-content-start");
 
     const bubble = document.createElement("div");
-    bubble.className =
-      "message " + (msg.type === "user"
-        ? "message-user"
-        : "message-ai");
+    bubble.className = "message " + (msg.type === "user"
+      ? "message-user"
+      : "message-ai");
 
     if (msg.content === "loading") {
       bubble.innerHTML = '<div class="loader"></div>';
-    } else {
+    } else if (msg.type === "user") {
       bubble.textContent = msg.content;
+    } else {
+      bubble.innerHTML = marked.parse(msg.content);
     }
 
     wrapper.appendChild(bubble);
     chatBox.appendChild(wrapper);
   });
-
   chatBox.scrollTop = chatBox.scrollHeight;
 }
 
