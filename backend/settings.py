@@ -41,6 +41,7 @@ class Settings:
             "http://localhost:8501",
             "http://127.0.0.1:5500",
             "http://localhost:3000",
+            "http://localhost:63342",
         ]
 
     def get_default_model(self, api_type: str) -> str:

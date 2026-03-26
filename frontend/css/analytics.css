@@ -1,0 +1,7 @@
+body {
+  background: #f8f9fa;
+}
+
+canvas {
+  max-height: 300px;
+}
