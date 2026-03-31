@@ -1,0 +1,251 @@
+word	freq
+bitcoin	200.0
+btc	180.0
+ethereum	150.0
+eth	140.0
+цена	120.0
+стоимость	110.0
+сколько	100.0
+биткоин	95.0
+эфир	90.0
+динамика	85.0
+история	80.0
+тренд	75.0
+топ	70.0
+лидеры	68.0
+рейтинг	65.0
+solana	60.0
+sol	58.0
+cardano	55.0
+ada	53.0
+binance coin	50.0
+bnb	48.0
+ripple	45.0
+xrp	43.0
+dogecoin	40.0
+doge	38.0
+polkadot	35.0
+dot	33.0
+chainlink	30.0
+link	28.0
+litecoin	25.0
+ltc	23.0
+uniswap	22.0
+uni	20.0
+aave	19.0
+avalanche	18.0
+avax	17.0
+polygon	16.0
+matic	15.0
+near	14.0
+aptos	12.0
+arbitrum	11.0
+arb	10.0
+optimism	9.0
+op	8.0
+капитализация	70.0
+объем	65.0
+рынок	60.0
+график	55.0
+изменение	50.0
+рост	48.0
+падение	45.0
+упал	42.0
+вырос	40.0
+неделя	85.0
+месяц	80.0
+год	75.0
+сегодня	70.0
+вчера	65.0
+день	60.0
+coingecko	50.0
+coinmarketcap	45.0
+api	40.0
+данные	35.0
+источник	30.0
+блокчейн	55.0
+blockchain	52.0
+майнинг	45.0
+mining	42.0
+стейкинг	40.0
+staking	38.0
+комиссия	35.0
+газ	32.0
+gas	30.0
+кошелек	28.0
+wallet	25.0
+транзакция	24.0
+transaction	22.0
+сеть	20.0
+network	18.0
+протокол	15.0
+protocol	14.0
+децентрализованный	12.0
+defi	35.0
+nft	30.0
+смарт-контракт	25.0
+smart contract	23.0
+hodl	40.0
+fomo	35.0
+fud	30.0
+ath	28.0
+rekt	25.0
+whale	22.0
+moon	20.0
+diamond hands	15.0
+paper hands	12.0
+pump	18.0
+dump	16.0
+airdrop	20.0
+yield farming	18.0
+liquidity	25.0
+liquidity pool	20.0
+bridge	15.0
+oracle	12.0
+governance	10.0
+dao	18.0
+layer1	12.0
+layer2	11.0
+cex	25.0
+dex	24.0
+order book	10.0
+stablecoin	30.0
+usdt	28.0
+usdc	26.0
+dai	15.0
+meme coin	12.0
+shitcoin	8.0
+altcoin	20.0
+бычий	25.0
+медвежий	23.0
+bull	22.0
+bear	20.0
+коррекция	18.0
+отскок	15.0
+обвал	14.0
+ралли	12.0
+волатильность	20.0
+volatility	18.0
+ликвидация	15.0
+купить	35.0
+продать	33.0
+buy	30.0
+sell	28.0
+лонг	20.0
+шорт	18.0
+long	17.0
+short	15.0
+позиция	12.0
+ордер	10.0
+order	9.0
+профит	8.0
+убыток	7.0
+вход	6.0
+exit	5.0
+сравни	25.0
+сравнение	22.0
+покажи	20.0
+найди	18.0
+какой	15.0
+что	12.0
+почему	10.0
+прогноз	35.0
+перспективы	25.0
+анализ	20.0
+инвестиции	18.0
+портфель	15.0
+диверсификация	10.0
+риски	12.0
+прибыль	10.0
+доходность	8.0
+current price	90.0
+historical prices	70.0
+top coins	65.0
+market cap	55.0
+volume	50.0
+supply	25.0
+циркулирующее предложение	15.0
+максимальное предложение	12.0
+halving	35.0
+хальвинг	30.0
+proof of work	20.0
+pow	18.0
+proof of stake	19.0
+pos	17.0
+сатоши	15.0
+satoshi	14.0
+wei	10.0
+gwei	8.0
+метамаск	12.0
+metamask	11.0
+ledger	10.0
+trezor	8.0
+биржа	25.0
+exchange	23.0
+binance	30.0
+bybit	20.0
+kraken	15.0
+okx	12.0
+держатель	10.0
+holder	9.0
+трейдер	8.0
+trader	7.0
+инвестор	6.0
+validator	15.0
+валидатор	14.0
+майнер	12.0
+miner	11.0
+аирдроп	10.0
+форк	8.0
+fork	7.0
+whitepaper	6.0
+технический анализ	12.0
+фундаментальный анализ	10.0
+ta	8.0
+fa	7.0
+индикатор	6.0
+rsi	10.0
+moving average	9.0
+ma	8.0
+сопротивление	7.0
+поддержка	6.0
+resistance	5.0
+support	4.0
+быки	6.0
+медведи	5.0
+аптренд	4.0
+даунтренд	3.0
+боковик	2.0
+флет	1.0
+эфириум классик	8.0
+etc	7.0
+stellar	6.0
+xlm	5.0
+algorand	4.0
+algo	3.0
+vechain	2.0
+vet	1.0
+the sandbox	2.0
+sand	1.0
+decentraland	2.0
+mana	1.0
+axie infinity	2.0
+axs	1.0
+filecoin	2.0
+fil	1.0
+theta	2.0
+theta fuel	1.0
+tfuel	1.0
+helium	2.0
+hnt	1.0
+internet computer	2.0
+icp	1.0
+fetch ai	2.0
+fet	1.0
+render	2.0
+rndr	1.0
+gala	2.0
+immutable	2.0
+imx	1.0
+flow	2.0
+enjin	1.0
