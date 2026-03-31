@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agent import ControllerAgent
 from agent.providers import ProviderManager
-from api.routes import ask, market, system
+from api.routes import ask, market, suggest, system
 from settings import settings
 
 logging.basicConfig(level=logging.INFO,
@@ -32,6 +32,7 @@ def create_app() -> FastAPI:
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
                        allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
     app.include_router(ask.router, prefix="/ask", tags=["Анализ"])
+    app.include_router(suggest.router, prefix="/suggest", tags=["Анализ"])
     app.include_router(market.router, prefix="/market", tags=["Рынок"])
     app.include_router(system.router, prefix="/system", tags=["Система"])
 
