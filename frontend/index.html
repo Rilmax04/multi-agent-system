@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuse.js автодополнение</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            width: 100%;
+            max-width: 650px;
+        }
+        h1 { font-size: 24px; color: #333; margin-bottom: 8px; }
+        .subtitle { color: #666; margin-bottom: 24px; font-size: 14px; }
+        .search-container { position: relative; }
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+        input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            margin-top: 8px;
+            max-height: 350px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        .suggestions.show { display: block; }
+        .suggestion-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .suggestion-item:hover { background: #f8f9ff; }
+        .suggestion-title {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .suggestion-detail {
+            font-size: 12px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .badge-score { background: #e8eaff; color: #667eea; }
+        .badge-freq { background: #e8f5e9; color: #2e7d32; }
+        .badge-rank { background: #fff3e0; color: #ed6c02; }
+        .badge-type { background: #f3e5f5; color: #7b1fa2; }
+        .stats {
+            margin-top: 20px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            font-size: 13px;
+            color: #666;
+        }
+        .stats strong { color: #667eea; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .suggestions.show { animation: fadeIn 0.2s ease; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 10px; }
+        .fuse-info {
+            margin-top: 12px;
+            padding: 8px 12px;
+            background: #f0f0ff;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #667eea;
+            text-align: center;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #667eea;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .debug {
+            font-family: monospace;
+            font-size: 10px;
+            color: #999;
+            margin-top: 10px;
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Fuse.js автодополнение</h1>
+        <div class="subtitle">
+            Нечёткий поиск по частотному словарю НКРЯ (леммы + словоформы)
+        </div>
+
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Начните вводить слово..." autocomplete="off">
+            <div id="suggestions" class="suggestions"></div>
+        </div>
+
+        <div class="stats" id="stats">
+            📚 <strong>Загрузка словаря...</strong>
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+        <div class="fuse-info">
+            ⚡ Fuse.js ищет даже с опечатками: "челавек" → "человек", "врема" → "время"
+        </div>
+        <div class="debug" id="debug"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
+
+    <script>
+        let dictionary = [];
+        let fuseInstance = null;
+        let isLoaded = false;
+
+        function updateProgress(percent, text) {
+            const progressFill = document.getElementById('progressFill');
+            const statsDiv = document.getElementById('stats');
+            if (progressFill) progressFill.style.width = percent + '%';
+            if (text && statsDiv && !isLoaded) {
+                statsDiv.innerHTML = `📚 <strong>${text}</strong><div class="progress-bar"><div class="progress-fill" style="width: ${percent}%"></div></div>`;
+            }
+        }
+
+        function formatFreq(freq) {
+            if (!freq) return '';
+            if (freq >= 1000) return (freq / 1000).toFixed(1) + 'k';
+            if (freq >= 100) return Math.round(freq) + '';
+            return freq.toFixed(1);
+        }
+
+        function debugLog(msg) {
+            const debugDiv = document.getElementById('debug');
+            if (debugDiv) {
+                debugDiv.innerHTML += msg + '<br>';
+                const lines = debugDiv.innerHTML.split('<br>');
+                if (lines.length > 30) {
+                    debugDiv.innerHTML = lines.slice(-30).join('<br>');
+                }
+                debugDiv.scrollTop = debugDiv.scrollHeight;
+            }
+            console.log(msg);
+        }
+
+        // Парсер для строк с пробелами/табами
+        function parseSpaceSeparatedLine(line) {
+            // Разделяем по пробелам и табам, убираем пустые
+            const parts = line.split(/\s+/);
+            return parts.filter(p => p.length > 0);
+        }
+
+        async function loadLemmas() {
+            updateProgress(10, 'Загрузка лемм (50,000+)...');
+            debugLog('📥 Начинаю загрузку lemmas.csv...');
+
+            try {
+                const response = await fetch('js/dictionary/lemmas.csv');
+                debugLog(`📥 Ответ получен, статус: ${response.status}`);
+                const text = await response.text();
+                debugLog(`📥 Размер файла: ${text.length} символов`);
+
+                const lines = text.split('\n');
+                debugLog(`📄 Всего строк: ${lines.length}`);
+
+                const lemmas = [];
+                let skipped = 0;
+                let headerSkipped = false;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    // Пропускаем заголовок
+                    if (!headerSkipped && (line.includes('Lemma') || line.includes('PoS') || line.includes('Freq'))) {
+                        debugLog(`📌 Пропущен заголовок: ${line.substring(0, 100)}`);
+                        headerSkipped = true;
+                        continue;
+                    }
+
+                    // Разделяем по пробелам/табам
+                    const parts = parseSpaceSeparatedLine(line);
+
+                    // Формат: Lemma, PoS, Freq(ipm), R, D, Doc
+                    // Нужно минимум 3 части: слово, часть речи, частота
+                    if (parts.length >= 3) {
+                        const word = parts[0];
+                        // Частота — это третий элемент (индекс 2)
+                        const freq = parseFloat(parts[2]);
+                        // Ранг — четвёртый элемент (индекс 3)
+                        const rank = parts.length >= 4 ? parseInt(parts[3]) : null;
+
+                        if (word && !isNaN(freq) && word.length > 0 && word !== 'Lemma' && word !== 'Лемма') {
+                            lemmas.push({
+                                word: word,
+                                freq: freq,
+                                rank: rank,
+                                type: 'lemma'
+                            });
+
+                            if (lemmas.length === 1) debugLog(`✅ Первая лемма: ${word}, частота: ${freq}`);
+                        } else {
+                            skipped++;
+                            if (skipped < 3) debugLog(`⚠️ Пропущена строка ${i}: word="${word}", freq=${parts[2]}`);
+                        }
+                    } else {
+                        skipped++;
+                        if (skipped < 3) debugLog(`⚠️ Пропущена строка ${i}: слишком мало частей (${parts.length})`);
+                    }
+                }
+
+                debugLog(`✅ Леммы: загружено ${lemmas.length}, пропущено ${skipped}`);
+                updateProgress(60, `Загружено ${lemmas.length.toLocaleString()} лемм`);
+                return lemmas;
+
+            } catch (error) {
+                debugLog(`❌ Ошибка загрузки lemmas.csv: ${error.message}`);
+                throw error;
+            }
+        }
+
+        async function loadWordforms() {
+            updateProgress(65, 'Загрузка словоформ (19,000+)...');
+            debugLog('📥 Начинаю загрузку wordforms.csv...');
+
+            try {
+                const response = await fetch('js/dictionary/wordforms.csv');
+                const text = await response.text();
+                const lines = text.split('\n');
+                debugLog(`📄 wordforms.csv строк: ${lines.length}`);
+
+                const wordforms = [];
+                let skipped = 0;
+                let headerSkipped = false;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    if (!headerSkipped && (line.includes('Словоформа') || line.includes('Wordform') || line.includes('Частота'))) {
+                        debugLog(`📌 Пропущен заголовок wordforms: ${line.substring(0, 80)}`);
+                        headerSkipped = true;
+                        continue;
+                    }
+
+                    // wordforms.csv — это CSV с запятыми
+                    const parts = line.split(',').map(p => p.trim());
+
+                    if (parts.length >= 2) {
+                        const word = parts[0];
+                        const freq = parseFloat(parts[1]);
+
+                        if (word && !isNaN(freq) && word.length > 0) {
+                            wordforms.push({
+                                word: word,
+                                freq: freq,
+                                rank: null,
+                                type: 'wordform'
+                            });
+                        } else {
+                            skipped++;
+                        }
+                    } else {
+                        skipped++;
+                    }
+                }
+
+                debugLog(`✅ Словоформы: загружено ${wordforms.length}, пропущено ${skipped}`);
+                updateProgress(85, `Загружено ${wordforms.length.toLocaleString()} словоформ`);
+                return wordforms;
+
+            } catch (error) {
+                debugLog(`⚠️ wordforms.csv не загружен: ${error.message}`);
+                return [];
+            }
+        }
+
+        function mergeDictionaries(lemmas, wordforms) {
+            updateProgress(90, 'Объединение словарей...');
+            debugLog(`🔄 Объединение: лемм ${lemmas.length}, словоформ ${wordforms.length}`);
+
+            const wordMap = new Map();
+
+            for (const lemma of lemmas) {
+                wordMap.set(lemma.word, lemma);
+            }
+
+            let addedWordforms = 0;
+            for (const wf of wordforms) {
+                if (!wordMap.has(wf.word)) {
+                    wordMap.set(wf.word, wf);
+                    addedWordforms++;
+                }
+            }
+
+            const merged = Array.from(wordMap.values());
+            merged.sort((a, b) => (b.freq || 0) - (a.freq || 0));
+
+            debugLog(`📊 ИТОГОВЫЙ СЛОВАРЬ: ${merged.length.toLocaleString()} слов`);
+            debugLog(`   - Лемм: ${lemmas.length}`);
+            debugLog(`   - Словоформ (уникальных): ${addedWordforms}`);
+            debugLog(`   - Всего уникальных слов: ${merged.length}`);
+
+            return merged;
+        }
+
+        function initFuse() {
+            const options = {
+                includeScore: true,
+                threshold: 0.4,
+                distance: 100,
+                ignoreLocation: true,
+                keys: ['word']
+            };
+
+            fuseInstance = new Fuse(dictionary, options);
+            debugLog(`✅ Fuse.js инициализирован, словарь: ${dictionary.length} слов`);
+        }
+
+        function searchSimilarWords(query, maxResults = 12) {
+            if (!query || query.length < 2 || !fuseInstance) return [];
+            const results = fuseInstance.search(query, { limit: maxResults });
+            return results.map(result => ({
+                word: result.item.word,
+                freq: result.item.freq,
+                rank: result.item.rank,
+                type: result.item.type,
+                score: result.score,
+                similarity: 1 - (result.score || 0)
+            }));
+        }
+
+        function updateSuggestions(query) {
+            const suggestionsDiv = document.getElementById('suggestions');
+            const statsDiv = document.getElementById('stats');
+
+            if (!isLoaded) return;
+
+            if (!query || query.length < 2) {
+                suggestionsDiv.classList.remove('show');
+                suggestionsDiv.innerHTML = '';
+                statsDiv.innerHTML = `
+                    ✅ <strong>Словарь загружен!</strong><br>
+                    📚 Всего слов: ${dictionary.length.toLocaleString()}<br>
+                    🔤 Лемм: ${dictionary.filter(w => w.type === 'lemma').length.toLocaleString()}<br>
+                    📝 Словоформ: ${dictionary.filter(w => w.type === 'wordform').length.toLocaleString()}<br>
+                    💡 Введите минимум 2 буквы для поиска
+                `;
+                return;
+            }
+
+            const results = searchSimilarWords(query);
+
+            if (results.length === 0) {
+                suggestionsDiv.innerHTML = `<div class="suggestion-item" style="color:#999;text-align:center;">😕 Ничего не найдено</div>`;
+                suggestionsDiv.classList.add('show');
+                statsDiv.innerHTML = `📊 <strong>Статистика для "${query}":</strong><br>🔍 Совпадений не найдено`;
+                return;
+            }
+
+            suggestionsDiv.innerHTML = results.map(result => {
+                const similarityPercent = (result.similarity * 100).toFixed(1);
+                const freqText = result.freq ? `${formatFreq(result.freq)} ipm` : '';
+                const rankText = result.rank ? `ранг #${result.rank}` : '';
+                const typeText = result.type === 'lemma' ? 'лемма' : 'словоформа';
+
+                return `
+                    <div class="suggestion-item" onclick="selectWord('${result.word.replace(/'/g, "\\'")}')">
+                        <div class="suggestion-title">
+                            <span>${result.word}</span>
+                            <span class="badge badge-score">${similarityPercent}%</span>
+                        </div>
+                        <div class="suggestion-detail">
+                            ${freqText ? `<span class="badge badge-freq">📊 ${freqText}</span>` : ''}
+                            ${rankText ? `<span class="badge badge-rank">🏆 ${rankText}</span>` : ''}
+                            <span class="badge badge-type">📌 ${typeText}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            suggestionsDiv.classList.add('show');
+
+            const bestMatch = results[0];
+            statsDiv.innerHTML = `
+                📊 <strong>Статистика для "${query}":</strong><br>
+                🎯 Лучшее: "${bestMatch.word}" (${(bestMatch.similarity * 100).toFixed(1)}%)<br>
+                📈 Найдено: ${results.length} вариантов
+            `;
+        }
+
+        function selectWord(word) {
+            const input = document.getElementById('searchInput');
+            input.value = word;
+            document.getElementById('suggestions').classList.remove('show');
+
+            const wordItem = dictionary.find(w => w.word === word);
+            const freqText = wordItem?.freq ? `${formatFreq(wordItem.freq)} ipm` : 'нет данных';
+            const typeText = wordItem?.type === 'lemma' ? 'лемма' : 'словоформа';
+
+            document.getElementById('stats').innerHTML = `
+                ✅ <strong>Выбрано слово: "${word}"</strong><br>
+                📊 Частота: ${freqText}<br>
+                📌 Тип: ${typeText}<br>
+                🔍 Найдено с помощью Fuse.js
+            `;
+        }
+
+        async function loadDictionary() {
+            try {
+                const [lemmas, wordforms] = await Promise.all([
+                    loadLemmas(),
+                    loadWordforms()
+                ]);
+
+                dictionary = mergeDictionaries(lemmas, wordforms);
+                initFuse();
+                isLoaded = true;
+
+                updateProgress(100, 'Готово!');
+                document.getElementById('stats').innerHTML = `
+                    ✅ <strong>Словарь загружен!</strong><br>
+                    📚 Всего слов: ${dictionary.length.toLocaleString()}<br>
+                    🔤 Лемм: ${dictionary.filter(w => w.type === 'lemma').length.toLocaleString()}<br>
+                    📝 Словоформ: ${dictionary.filter(w => w.type === 'wordform').length.toLocaleString()}<br>
+                    💡 Начните вводить слово для поиска
+                `;
+
+            } catch (error) {
+                debugLog(`❌ Критическая ошибка: ${error.message}`);
+                document.getElementById('stats').innerHTML = `
+                    ❌ <strong>Ошибка загрузки</strong><br>
+                    ${error.message}<br>
+                    Проверьте пути к файлам
+                `;
+            }
+        }
+
+        let debounceTimeout;
+        const input = document.getElementById('searchInput');
+        input.addEventListener('input', (e) => {
+            clearTimeout(debounceTimeout);
+            debounceTimeout = setTimeout(() => updateSuggestions(e.target.value.trim()), 100);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!input.contains(e.target) && !document.getElementById('suggestions').contains(e.target)) {
+                document.getElementById('suggestions').classList.remove('show');
+            }
+        });
+
+        loadDictionary();
+    </script>
+</body>
+</html>

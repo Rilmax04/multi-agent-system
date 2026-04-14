@@ -48,10 +48,10 @@ function restoreMessages() {
   }
 }
 
-const suggestedActions = [
-  { label: "Compare BTC and ETH", icon: "bi-arrow-left-right" },
-  { label: "Show top 5 coins", icon: "bi-graph-up" },
-  { label: "Analyze volatility", icon: "bi-activity" }
+const FALLBACK_SUGGESTED_ACTIONS = [
+  { label: "Сравни текущие цены BTC и ETH", icon: "bi-arrow-left-right" },
+  { label: "Покажи топ-5 криптовалют по капитализации", icon: "bi-graph-up" },
+  { label: "Как менялась цена Bitcoin за последние 7 дней?", icon: "bi-activity" }
 ];
 
 /* =========================
@@ -216,6 +216,7 @@ async function sendMessage() {
     persistMessages();
 
     renderMessages();
+    refreshSuggestedActions();
   } catch (err) {
     console.error(err);
 
@@ -228,6 +229,7 @@ async function sendMessage() {
     persistMessages();
 
     renderMessages();
+    refreshSuggestedActions();
   }
 }
 
@@ -241,26 +243,82 @@ document
 
 
 /* =========================
-   SUGGESTED ACTIONS
+   SUGGESTED ACTIONS (LLM + fallback)
 ========================= */
 
-const actionsContainer = document.getElementById("suggestedActions");
+function getRecentUserQuestions(msgs, limit = 15) {
+  const out = [];
+  for (const m of msgs) {
+    if (m?.type === "user" && m.content && m.content !== "loading") {
+      const t = String(m.content).trim();
+      if (t) out.push(t);
+    }
+  }
+  return out.slice(-limit);
+}
 
-suggestedActions.forEach(action => {
-  const btn = document.createElement("button");
-  btn.className = "btn btn-outline-secondary btn-sm d-flex align-items-center gap-2";
+function iconForSuggestionIndex(i) {
+  const icons = [
+    "bi-arrow-left-right",
+    "bi-graph-up",
+    "bi-activity",
+    "bi-lightbulb",
+    "bi-search",
+    "bi-currency-bitcoin"
+  ];
+  return icons[i % icons.length];
+}
 
-  btn.innerHTML = `
-    <i class="bi ${action.icon}"></i>
-    ${action.label}
-  `;
+function renderSuggestedActionButtons(actions) {
+  const actionsContainer = document.getElementById("suggestedActions");
+  if (!actionsContainer) return;
+  actionsContainer.innerHTML = "";
+  for (const action of actions) {
+    const btn = document.createElement("button");
+    btn.className = "btn btn-outline-secondary btn-sm d-flex align-items-center gap-2";
+    const icon = document.createElement("i");
+    icon.className = `bi ${action.icon}`;
+    btn.appendChild(icon);
+    btn.appendChild(document.createTextNode(` ${action.label}`));
+    btn.onclick = () => {
+      document.getElementById("chatInput").value = action.label;
+    };
+    actionsContainer.appendChild(btn);
+  }
+}
 
-  btn.onclick = () => {
-    document.getElementById("chatInput").value = action.label;
-  };
-
-  actionsContainer.appendChild(btn);
-});
+async function refreshSuggestedActions() {
+  const actionsContainer = document.getElementById("suggestedActions");
+  if (!actionsContainer) return;
+  actionsContainer.innerHTML =
+    '<span class="text-muted small">Updating suggestions…</span>';
+  try {
+    const past = getRecentUserQuestions(messages);
+    const res = await fetch(`${BACKEND_URL}/suggest`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify({ past_questions: past })
+    });
+    if (!res.ok) throw new Error(`suggest ${res.status}`);
+    const data = await res.json();
+    const labels = Array.isArray(data.suggestions)
+      ? data.suggestions.map(s => String(s).trim()).filter(Boolean).slice(0, 3)
+      : [];
+    const actions = labels.map((label, i) => ({
+      label,
+      icon: iconForSuggestionIndex(i)
+    }));
+    renderSuggestedActionButtons(
+      actions.length >= 3 ? actions : FALLBACK_SUGGESTED_ACTIONS
+    );
+  } catch (err) {
+    console.warn("Suggested actions:", err);
+    renderSuggestedActionButtons(FALLBACK_SUGGESTED_ACTIONS);
+  }
+}
 
 
 /* =========================
@@ -389,3 +447,4 @@ async function loadMarket() {
 restoreMessages();
 renderMessages();
 loadMarket();
+refreshSuggestedActions();
