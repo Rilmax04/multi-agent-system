@@ -4,10 +4,6 @@
 
 const LAST_TRACE_STORAGE_KEY = "rag:last_trace";
 
-function safeJsonParse(text) {
-  try { return JSON.parse(text); } catch (_) { return null; }
-}
-
 function stepMeta(stepName) {
   // Backend trace steps: planner, fetcher, formatter, reasoner
   const map = {
@@ -55,8 +51,10 @@ function buildWorkflowData(last) {
 ========================= */
 
 const container = document.getElementById("stepsContainer");
+const summary = document.getElementById("summaryContainer");
 
 function renderEmptyState() {
+  summary.innerHTML = "";
   container.innerHTML = `
     <div class="card border-warning">
       <div class="card-body">
@@ -76,64 +74,51 @@ function renderWorkflow(workflowData) {
   container.innerHTML = "";
 
   workflowData.steps.forEach((step, index) => {
-  const wrapper = document.createElement("div");
-  wrapper.className = "mb-4 position-relative";
+    const wrapper = document.createElement("div");
+    wrapper.className = "mb-4 position-relative";
 
-  const detailsHTML = step.details
-    .map(d => `
-      <div class="d-flex align-items-start gap-2">
-        <i class="bi bi-check-circle-fill text-${step.color} mt-1"></i>
-        <span>${d}</span>
-      </div>
-    `)
-    .join("");
+    const detailsHTML = step.details
+      .map(detail => `
+        <div class="d-flex align-items-start gap-2">
+          <i class="bi bi-check-circle-fill text-${step.color} mt-1"></i>
+          <span>${detail}</span>
+        </div>
+      `)
+      .join("");
 
-  wrapper.innerHTML += `
-    <div class="card border border-${step.color}" style="border-width: 1px 1px 1px 4px !important;">
-      <div class="card-body">
-        <div class="d-flex gap-3">
-
-          <!-- ICON -->
-          <div class="step-icon bg-${step.color}-subtle text-${step.color}">
-            <i class="bi ${step.icon}"></i>
-          </div>
-
-          <!-- CONTENT -->
-          <div class="flex-grow-1">
-
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <span class="agent-badge bg-${step.color}-subtle text-${step.color}">
-                ${step.agent}
-              </span>
-              <i class="bi bi-chevron-right text-muted"></i>
-              <small class="text-muted">
-                Step ${index + 1} of ${workflowData.steps.length}
-              </small>
+    wrapper.innerHTML = `
+      <div class="card border border-${step.color}" style="border-width: 1px 1px 1px 4px !important;">
+        <div class="card-body">
+          <div class="d-flex gap-3">
+            <div class="step-icon bg-${step.color}-subtle text-${step.color}">
+              <i class="bi ${step.icon}"></i>
             </div>
 
-            <h6 class="fw-semibold">${step.title}</h6>
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="agent-badge bg-${step.color}-subtle text-${step.color}">
+                  ${step.agent}
+                </span>
+                <i class="bi bi-chevron-right text-muted"></i>
+                <small class="text-muted">
+                  Step ${index + 1} of ${workflowData.steps.length}
+                </small>
+              </div>
 
-            <p class="text-muted small">${step.description}</p>
+              <h6 class="fw-semibold">${step.title}</h6>
+              <p class="text-muted small">${step.description}</p>
 
-            <div class="detail-box bg-${step.color}-subtle">
-              ${detailsHTML}
+              <div class="detail-box bg-${step.color}-subtle">
+                ${detailsHTML}
+              </div>
             </div>
-
           </div>
         </div>
       </div>
-    </div>
-  `;
+    `;
 
-  container.appendChild(wrapper);
+    container.appendChild(wrapper);
   });
-
-
-/* =========================
-   SUMMARY CARD
-========================= */
-
-const summary = document.getElementById("summaryContainer");
 
   summary.innerHTML = `
     <div class="card mt-4 border-primary">

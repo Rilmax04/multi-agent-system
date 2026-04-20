@@ -2,7 +2,6 @@
    CONFIG
 ========================= */
 
-const BACKEND_URL = "http://127.0.0.1:8000";
 const LAST_TRACE_STORAGE_KEY = "rag:last_trace";
 const CHAT_MESSAGES_STORAGE_KEY = "rag:chat_messages";
 
@@ -18,14 +17,6 @@ let messages = [
       "Hello! I'm your cryptocurrency analysis assistant. Ask me anything about crypto markets, prices, trends, or specific coins."
   }
 ];
-
-function safeJsonParse(text) {
-  try {
-    return JSON.parse(text);
-  } catch (_) {
-    return null;
-  }
-}
 
 function getPersistableMessages(msgs) {
   // Do not persist transient UI states.
@@ -60,32 +51,6 @@ const FALLBACK_SUGGESTED_ACTIONS = [
 
 let marketData = null;
 
-function formatUsdCompact(value) {
-  if (value == null || Number.isNaN(Number(value))) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-    maximumFractionDigits: 2
-  }).format(Number(value));
-}
-
-function formatUsd(value) {
-  if (value == null || Number.isNaN(Number(value))) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2
-  }).format(Number(value));
-}
-
-function formatPercent(value) {
-  if (value == null || Number.isNaN(Number(value))) return "—";
-  const v = Number(value);
-  const sign = v > 0 ? "+" : "";
-  return `${sign}${v.toFixed(2)}%`;
-}
-
 async function fetchMarketSnapshot({ coins = ["bitcoin", "ethereum"], source = null } = {}) {
   const params = new URLSearchParams();
   params.set("coins", coins.join(","));
@@ -96,7 +61,7 @@ async function fetchMarketSnapshot({ coins = ["bitcoin", "ethereum"], source = n
     headers: { Accept: "application/json" }
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => null);
+    const err = await parseJsonOrNull(res);
     throw new Error(err?.detail || `Market request failed (${res.status})`);
   }
   clearGlobalError();
@@ -180,7 +145,7 @@ async function sendMessage() {
     let aiContent = "";
 
     if (res.ok) {
-      const data = await res.json();
+      const data = await parseJsonOrNull(res);
       aiContent = data.answer ?? "";
       clearGlobalError();
 
@@ -196,7 +161,7 @@ async function sendMessage() {
         localStorage.setItem(LAST_TRACE_STORAGE_KEY, JSON.stringify(payload));
       } catch (_) {}
     } else if (res.status === 422) {
-      const data = await res.json().catch(() => null);
+      const data = await parseJsonOrNull(res);
       const detail = data?.detail;
 
       if (Array.isArray(detail) && detail.length) {
@@ -206,7 +171,7 @@ async function sendMessage() {
       }
       showGlobalError("Could not process the request. Please check the input data.");
     } else {
-      const data = await res.json().catch(() => null);
+      const data = await parseJsonOrNull(res);
       aiContent = data?.detail || `Request failed with status ${res.status}`;
       showGlobalError(aiContent || "The backend returned an invalid response.");
     }
@@ -308,7 +273,7 @@ async function refreshSuggestedActions() {
       body: JSON.stringify({ past_questions: past })
     });
     if (!res.ok) throw new Error(`suggest ${res.status}`);
-    const data = await res.json();
+    const data = await parseJsonOrNull(res);
     clearGlobalError();
     const labels = Array.isArray(data.suggestions)
       ? data.suggestions.map(s => String(s).trim()).filter(Boolean).slice(0, 3)

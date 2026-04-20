@@ -2,8 +2,6 @@
    CONFIG + STATE (real backend)
 ========================= */
 
-const BACKEND_URL = "http://127.0.0.1:8000";
-
 const analyticsData = {
   // coin_id from backend (/market/top and /market/history/{coin_id})
   selectedCoinId: null,
@@ -11,39 +9,13 @@ const analyticsData = {
   labels: []
 };
 
-function formatUsd(value) {
-  if (value == null || Number.isNaN(Number(value))) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2
-  }).format(Number(value));
-}
-
-function formatUsdCompact(value) {
-  if (value == null || Number.isNaN(Number(value))) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-    maximumFractionDigits: 2
-  }).format(Number(value));
-}
-
-function formatPercent(value) {
-  if (value == null || Number.isNaN(Number(value))) return "—";
-  const v = Number(value);
-  const sign = v > 0 ? "+" : "";
-  return `${sign}${v.toFixed(2)}%`;
-}
-
 async function apiGet(path) {
   const res = await fetch(`${BACKEND_URL}${path}`, {
     method: "GET",
     headers: { Accept: "application/json" }
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => null);
+    const err = await parseJsonOrNull(res);
     throw new Error(err?.detail || `Request failed (${res.status})`);
   }
   clearGlobalError();
