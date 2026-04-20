@@ -46,6 +46,7 @@ async function apiGet(path) {
     const err = await res.json().catch(() => null);
     throw new Error(err?.detail || `Request failed (${res.status})`);
   }
+  clearGlobalError();
   return res.json();
 }
 
@@ -156,7 +157,10 @@ function renderCharts() {
 
 document.getElementById("applyBtn").onclick = () => {
   analyticsData.selectedCoinId = select.value;
-  loadSelectedCoinSeries().catch(console.error);
+  loadSelectedCoinSeries().catch(e => {
+    console.error(e);
+    showGlobalError("Failed to update charts for the selected coin.");
+  });
 };
 
 
@@ -227,6 +231,7 @@ async function init() {
     await loadSelectedCoinSeries();
   } catch (e) {
     console.error(e);
+    showGlobalError("Failed to load analytics data from the backend.");
   }
 }
 
