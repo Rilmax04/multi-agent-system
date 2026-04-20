@@ -99,6 +99,7 @@ async function fetchMarketSnapshot({ coins = ["bitcoin", "ethereum"], source = n
     const err = await res.json().catch(() => null);
     throw new Error(err?.detail || `Market request failed (${res.status})`);
   }
+  clearGlobalError();
   return res.json();
 }
 
@@ -181,6 +182,7 @@ async function sendMessage() {
     if (res.ok) {
       const data = await res.json();
       aiContent = data.answer ?? "";
+      clearGlobalError();
 
       // Save last trace for Workflow page (real backend data)
       try {
@@ -202,9 +204,11 @@ async function sendMessage() {
       } else {
         aiContent = "Validation Error";
       }
+      showGlobalError("Could not process the request. Please check the input data.");
     } else {
       const data = await res.json().catch(() => null);
       aiContent = data?.detail || `Request failed with status ${res.status}`;
+      showGlobalError(aiContent || "The backend returned an invalid response.");
     }
 
     messages = messages.filter(msg => msg.id !== loadingId);
@@ -219,6 +223,7 @@ async function sendMessage() {
     refreshSuggestedActions();
   } catch (err) {
     console.error(err);
+    showGlobalError("Backend service is unavailable. Please try again later.");
 
     messages = messages.filter(msg => msg.id !== loadingId);
     messages.push({
@@ -304,6 +309,7 @@ async function refreshSuggestedActions() {
     });
     if (!res.ok) throw new Error(`suggest ${res.status}`);
     const data = await res.json();
+    clearGlobalError();
     const labels = Array.isArray(data.suggestions)
       ? data.suggestions.map(s => String(s).trim()).filter(Boolean).slice(0, 3)
       : [];
@@ -316,6 +322,7 @@ async function refreshSuggestedActions() {
     );
   } catch (err) {
     console.warn("Suggested actions:", err);
+    showGlobalError("Failed to load suggested actions.");
     renderSuggestedActionButtons(FALLBACK_SUGGESTED_ACTIONS);
   }
 }
@@ -432,7 +439,9 @@ async function loadMarket() {
         dominance: btcDominance == null ? "—" : `${btcDominance.toFixed(1)}%`
       }
     };
+    clearGlobalError();
   } catch (e) {
+    showGlobalError("Failed to load market data.");
     marketData = {
       coins: [],
       trend: "Market data unavailable",
