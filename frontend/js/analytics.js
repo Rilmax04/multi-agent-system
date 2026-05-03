@@ -54,12 +54,11 @@ function renderTable() {
       </td>
       <td class="text-end fw-medium">${formatUsd(c.price_usd)}</td>
       <td class="text-end">
-        <span class="${(c.change_24h_percent ?? 0) >= 0 ? 'text-success' : 'text-danger'} fw-medium">
+        <span class="${changeClass(c.change_24h_percent)} fw-medium">
           ${formatPercent(c.change_24h_percent)}
         </span>
       </td>
       <td class="text-end text-secondary">${formatUsdCompact(c.market_cap_usd)}</td>
-      <td class="text-end text-secondary">${formatUsdCompact(c.volume_24h_usd)}</td>
     </tr>
   `).join("");
 }
@@ -70,7 +69,12 @@ function renderTable() {
 ========================= */
 
 let priceChart;
-let marketCapChart;
+
+function changeClass(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return "text-muted";
+  return numericValue >= 0 ? "text-success" : "text-danger";
+}
 
 function renderCharts() {
   const coin = analyticsData.coins.find(c => c.coin_id === analyticsData.selectedCoinId);
@@ -80,7 +84,6 @@ function renderCharts() {
     .textContent = `Price Chart (${coin.symbol})`;
 
   if (priceChart) priceChart.destroy();
-  if (marketCapChart) marketCapChart.destroy();
 
   priceChart = new Chart(
     document.getElementById("priceChart"),
@@ -93,25 +96,6 @@ function renderCharts() {
           data: coin.priceHistory ?? [],
           borderWidth: 2,
           tension: 0.3
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { display: false } }
-      }
-    }
-  );
-
-  marketCapChart = new Chart(
-    document.getElementById("marketCapChart"),
-    {
-      type: "bar",
-      data: {
-        labels: analyticsData.labels,
-        datasets: [{
-          label: "Market Cap (B$)",
-          data: coin.marketCapHistory ?? [],
-          borderWidth: 1
         }]
       },
       options: {
@@ -154,8 +138,7 @@ async function loadTopCoins() {
     change_24h_percent: c.change_24h_percent,
     source: c.source,
     // will be filled by loadSelectedCoinSeries
-    priceHistory: [],
-    marketCapHistory: []
+    priceHistory: []
   }));
 
   if (!analyticsData.selectedCoinId && analyticsData.coins.length) {
@@ -187,11 +170,6 @@ async function loadSelectedCoinSeries() {
   const coin = analyticsData.coins.find(c => c.coin_id === coinId);
   if (coin) {
     coin.priceHistory = prices;
-
-    // Backend does not provide market cap history in /market/history,
-    // so we display current market cap repeated across the period.
-    const capB = coin.market_cap_usd != null ? Number(coin.market_cap_usd) / 1e9 : null;
-    coin.marketCapHistory = capB == null ? prices.map(() => null) : prices.map(() => capB);
   }
 
   renderCharts();
