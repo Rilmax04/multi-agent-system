@@ -54,7 +54,7 @@ function renderTable() {
       </td>
       <td class="text-end fw-medium">${formatUsd(c.price_usd)}</td>
       <td class="text-end">
-        <span class="${(c.change_24h_percent ?? 0) >= 0 ? 'text-success' : 'text-danger'} fw-medium">
+        <span class="${changeClass(c.change_24h_percent)} fw-medium">
           ${formatPercent(c.change_24h_percent)}
         </span>
       </td>
@@ -69,6 +69,12 @@ function renderTable() {
 ========================= */
 
 let priceChart;
+
+function changeClass(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return "text-muted";
+  return numericValue >= 0 ? "text-success" : "text-danger";
+}
 
 function renderCharts() {
   const coin = analyticsData.coins.find(c => c.coin_id === analyticsData.selectedCoinId);

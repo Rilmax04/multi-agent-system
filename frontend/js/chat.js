@@ -311,7 +311,7 @@ function renderMarket() {
     <div class="p-3 mb-3 market-card">
       <div class="d-flex justify-content-between mb-1">
         <span class="small text-secondary">${c.name}</span>
-        <span class="small fw-semibold ${c.positive ? 'text-success' : 'text-danger'}">
+        <span class="small fw-semibold ${c.changeClass}">
           ${c.change}
         </span>
       </div>
@@ -326,7 +326,7 @@ function renderMarket() {
     <div class="p-3 mb-3 border border-success rounded bg-success-subtle">
       <div class="d-flex align-items-center gap-2 mb-2">
         <i class="bi bi-graph-up text-success"></i>
-        <span class="fw-semibold text-success">Market Trend</span>
+        <span class="fw-semibold text-success">BTC/ETH 24h Signal</span>
       </div>
       <div class="small text-success">
         ${marketData.trend}
@@ -335,15 +335,15 @@ function renderMarket() {
 
     <div class="pt-3 border-top">
       <div class="d-flex justify-content-between small mb-2">
-        <span class="text-secondary">Total Market Cap</span>
+        <span class="text-secondary">BTC+ETH Market Cap</span>
         <span class="fw-semibold">${marketData.stats.marketCap}</span>
       </div>
       <div class="d-flex justify-content-between small mb-2">
-        <span class="text-secondary">24h Volume</span>
+        <span class="text-secondary">BTC+ETH 24h Volume</span>
         <span class="fw-semibold">${marketData.stats.volume24h}</span>
       </div>
       <div class="d-flex justify-content-between small">
-        <span class="text-secondary">BTC Dominance</span>
+        <span class="text-secondary">BTC Share of BTC+ETH Cap</span>
         <span class="fw-semibold">${marketData.stats.dominance}</span>
       </div>
     </div>
@@ -364,7 +364,10 @@ async function loadMarket() {
     const btc = prices?.bitcoin;
     const eth = prices?.ethereum;
     const coins = [btc, eth].filter(Boolean).map(p => {
-      const isPositive = (p.change_24h_percent ?? 0) >= 0;
+      const changeValue = Number(p.change_24h_percent);
+      const changeClass = Number.isFinite(changeValue)
+        ? changeValue >= 0 ? "text-success" : "text-danger"
+        : "text-muted";
       const symbol = p.coin_id === "bitcoin" ? "BTC" : p.coin_id === "ethereum" ? "ETH" : p.coin_id?.toUpperCase();
       const name = p.coin_id === "bitcoin" ? "Bitcoin" : p.coin_id === "ethereum" ? "Ethereum" : p.coin_id;
       return {
@@ -372,28 +375,43 @@ async function loadMarket() {
         change: formatPercent(p.change_24h_percent),
         price: formatUsd(p.price_usd),
         volume: formatUsdCompact(p.volume_24h_usd),
-        positive: isPositive,
+        changeClass,
         marketCapUsd: p.market_cap_usd ?? null
       };
     });
 
-    const totalMarketCap =
-      (btc?.market_cap_usd ?? 0) + (eth?.market_cap_usd ?? 0);
-    const totalVolume =
-      (btc?.volume_24h_usd ?? 0) + (eth?.volume_24h_usd ?? 0);
+    const capValues = [btc?.market_cap_usd, eth?.market_cap_usd]
+      .map(Number)
+      .filter(Number.isFinite);
+    const volumeValues = [btc?.volume_24h_usd, eth?.volume_24h_usd]
+      .map(Number)
+      .filter(Number.isFinite);
+    const changeValues = [btc?.change_24h_percent, eth?.change_24h_percent]
+      .map(Number)
+      .filter(Number.isFinite);
+
+    const totalMarketCap = capValues.length === 2
+      ? capValues.reduce((sum, value) => sum + value, 0)
+      : null;
+    const totalVolume = volumeValues.length === 2
+      ? volumeValues.reduce((sum, value) => sum + value, 0)
+      : null;
     const btcDominance =
-      totalMarketCap > 0 && btc?.market_cap_usd != null
-        ? (btc.market_cap_usd / totalMarketCap) * 100
+      totalMarketCap > 0 && Number.isFinite(Number(btc?.market_cap_usd))
+        ? (Number(btc.market_cap_usd) / totalMarketCap) * 100
         : null;
 
-    const avgChange =
-      ((btc?.change_24h_percent ?? 0) + (eth?.change_24h_percent ?? 0)) / 2;
+    const avgChange = changeValues.length
+      ? changeValues.reduce((sum, value) => sum + value, 0) / changeValues.length
+      : null;
     const trend =
-      avgChange > 0.5
-        ? "Bullish momentum across major cryptocurrencies"
-        : avgChange < -0.5
-          ? "Bearish pressure across major cryptocurrencies"
-          : "Mixed momentum across major cryptocurrencies";
+      avgChange == null
+        ? "24h change data is unavailable from the backend"
+        : avgChange > 0.5
+          ? "Positive average 24h change across BTC and ETH"
+          : avgChange < -0.5
+            ? "Negative average 24h change across BTC and ETH"
+            : "Mixed or flat average 24h change across BTC and ETH";
 
     marketData = {
       coins,
