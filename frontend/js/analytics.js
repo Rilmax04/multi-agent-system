@@ -59,7 +59,6 @@ function renderTable() {
         </span>
       </td>
       <td class="text-end text-secondary">${formatUsdCompact(c.market_cap_usd)}</td>
-      <td class="text-end text-secondary">${formatUsdCompact(c.volume_24h_usd)}</td>
     </tr>
   `).join("");
 }
