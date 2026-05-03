@@ -332,21 +332,6 @@ function renderMarket() {
         ${marketData.trend}
       </div>
     </div>
-
-    <div class="pt-3 border-top">
-      <div class="d-flex justify-content-between small mb-2">
-        <span class="text-secondary">BTC+ETH Market Cap</span>
-        <span class="fw-semibold">${marketData.stats.marketCap}</span>
-      </div>
-      <div class="d-flex justify-content-between small mb-2">
-        <span class="text-secondary">BTC+ETH 24h Volume</span>
-        <span class="fw-semibold">${marketData.stats.volume24h}</span>
-      </div>
-      <div class="d-flex justify-content-between small">
-        <span class="text-secondary">BTC Share of BTC+ETH Cap</span>
-        <span class="fw-semibold">${marketData.stats.dominance}</span>
-      </div>
-    </div>
   `;
 }
 
@@ -375,31 +360,13 @@ async function loadMarket() {
         change: formatPercent(p.change_24h_percent),
         price: formatUsd(p.price_usd),
         volume: formatUsdCompact(p.volume_24h_usd),
-        changeClass,
-        marketCapUsd: p.market_cap_usd ?? null
+        changeClass
       };
     });
 
-    const capValues = [btc?.market_cap_usd, eth?.market_cap_usd]
-      .map(Number)
-      .filter(Number.isFinite);
-    const volumeValues = [btc?.volume_24h_usd, eth?.volume_24h_usd]
-      .map(Number)
-      .filter(Number.isFinite);
     const changeValues = [btc?.change_24h_percent, eth?.change_24h_percent]
       .map(Number)
       .filter(Number.isFinite);
-
-    const totalMarketCap = capValues.length === 2
-      ? capValues.reduce((sum, value) => sum + value, 0)
-      : null;
-    const totalVolume = volumeValues.length === 2
-      ? volumeValues.reduce((sum, value) => sum + value, 0)
-      : null;
-    const btcDominance =
-      totalMarketCap > 0 && Number.isFinite(Number(btc?.market_cap_usd))
-        ? (Number(btc.market_cap_usd) / totalMarketCap) * 100
-        : null;
 
     const avgChange = changeValues.length
       ? changeValues.reduce((sum, value) => sum + value, 0) / changeValues.length
@@ -415,12 +382,7 @@ async function loadMarket() {
 
     marketData = {
       coins,
-      trend,
-      stats: {
-        marketCap: formatUsdCompact(totalMarketCap),
-        volume24h: formatUsdCompact(totalVolume),
-        dominance: btcDominance == null ? "—" : `${btcDominance.toFixed(1)}%`
-      }
+      trend
     };
     clearGlobalError();
   } catch (e) {
@@ -428,7 +390,6 @@ async function loadMarket() {
     marketData = {
       coins: [],
       trend: "Market data unavailable",
-      stats: { marketCap: "—", volume24h: "—", dominance: "—" },
       error: String(e?.message || e)
     };
   }
